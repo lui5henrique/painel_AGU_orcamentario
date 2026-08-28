@@ -733,10 +733,9 @@ a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible
     <div class="panel-head">
       <div>
         <h3 class="section-title">Valores pagos por fornecedor ao mês</h3>
-        <p class="section-desc">Evolução mensal dos pagamentos (OB). Mostra o fornecedor selecionado na segmentação, ou o de maior valor pago no período.</p>
+        <p class="section-desc">Evolução mensal dos pagamentos (OB). Mostra o fornecedor selecionado na segmentação, ou o primeiro em ordem alfabética.</p>
       </div>
     </div>
-    <p class="chart-subtitle" id="fornecedorMesSubtitle">—</p>
     <div class="panel-chartbox" style="height:380px;">
       <canvas id="chartFornecedorMes"></canvas>
     </div>
@@ -1224,29 +1223,26 @@ function renderChartFornecedorMes(filteredOb){
   destroyChart('fornecedorMes');
   const canvasEl = $('#chartFornecedorMes');
 
-  let k, subtitlePrefix;
+  let k;
   if(state.filters.fornecedor){
     k = state.filters.fornecedor;
-    subtitlePrefix = 'Fornecedor selecionado: ';
   } else {
-    const totals = new Map();
+    const presentes = new Set();
     filteredOb.forEach(o => {
       const key = fornecedorKey(o.cnpj, o.fornecedor);
-      if(!key) return;
-      totals.set(key, (totals.get(key)||0) + (Number(o.valor)||0));
+      if(key) presentes.add(key);
     });
-    const sorted = [...totals.entries()].sort((a,b) => b[1]-a[1]);
-    if(sorted.length === 0){
-      $('#fornecedorMesSubtitle').textContent = 'Nenhum pagamento no filtro atual';
+    if(presentes.size === 0){
       showChartEmpty(canvasEl, 'Nenhum pagamento (OB) encontrado para o filtro atual.');
       return;
     }
-    k = sorted[0][0];
-    subtitlePrefix = 'Maior valor pago no período (selecione outro na segmentação): ';
+    // primeiro fornecedor em ordem alfabética crescente (pelo nome de exibição)
+    k = [...presentes].sort((a,b) =>
+      (fornecedorNomeMap.get(a) || a).localeCompare(fornecedorNomeMap.get(b) || b, 'pt-BR')
+    )[0];
   }
 
   const label = shorten(fornecedorNomeMap.get(k) || k, 40);
-  $('#fornecedorMesSubtitle').textContent = subtitlePrefix + label;
 
   const byMonth = new Map(meses.map(m => [m,0]));
   filteredOb.forEach(o => {
