@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGU · Painel de Execução Orçamentária</title>
+<link rel="icon" href="assets/img/logo-agu.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="assets/css/painel.css">
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<div class="topnav">
+  <div class="topnav-inner">
+    <div class="brand">
+      <img src="assets/img/logo-agu.png" alt="AGU">
+      <div class="brand-text">
+        <span class="brand-title">Painel de Execução Orçamentária</span>
+        <span class="brand-sub">Superintendência Regional de Administração da 5ª Região - SAD 5R</span>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <span class="updated-chip" id="updatedChip"><span class="updated-dot"></span> Base atualizada em <b id="updatedDate">—</b></span>
+      <button class="btn btn-ghost btn-sm" id="clearFiltersBtn">Limpar filtros</button>
+      <button class="btn btn-primary" id="openUploadBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Atualizar base
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ AVISO: fetch de data.json bloqueado (abertura via file://) ============ -->
+<div class="fallback-banner" id="fetchFallbackBanner">
+  <div class="container fallback-banner-inner">
+    <span>
+      <b>Não foi possível carregar o exemplo automaticamente.</b>
+      Isso costuma acontecer ao abrir este arquivo direto (duplo-clique / <code>file://</code>).
+      Sirva esta pasta com um servidor local (ex.: <code>python -m http.server 8080</code> dentro de "Painel AGU/") e recarregue,
+      ou importe seus próprios arquivos agora.
+    </span>
+    <button class="btn btn-primary btn-sm" id="fetchFallbackImportBtn">Importar base</button>
+  </div>
+</div>
+
+<!-- ============ HERO / KPIs ============ -->
+<div class="hero">
+  <div class="container">
+    <div class="hero-top">
+      <div>
+        <p class="eyebrow">Get started · consulta em tempo real</p>
+        <h1 class="hero-title">Contratos, empenhos e pagamentos.</h1>
+        <p class="hero-desc">Filtre por contrato, empenho, fornecedor ou estado e acompanhe a execução orçamentária sem precisar abrir três planilhas diferentes.</p>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total empenhado</div>
+        <div class="kpi-value grad" id="kpiEmpenhado">—</div>
+        <div class="kpi-sub" id="kpiEmpenhadoSub">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total pago (OB)</div>
+        <div class="kpi-value grad" id="kpiPago">—</div>
+        <div class="kpi-sub" id="kpiPagoSub">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">% Execução (acumulada)</div>
+        <div class="kpi-value" id="kpiExecucao">—</div>
+        <div class="kpi-sub">Pago ÷ Empenhado, histórico completo do empenho</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Contratos vigentes</div>
+        <div class="kpi-value" id="kpiVigentes">—</div>
+        <div class="kpi-sub" id="kpiVigentesSub">—</div>
+      </div>
+      <div class="kpi-card alert">
+        <div class="kpi-label">⚠ A vencer em 90 dias</div>
+        <div class="kpi-value" id="kpiVencendo">—</div>
+        <div class="kpi-sub">Requer atenção de renovação</div>
+      </div>
+    </div>
+    <div class="kpi-footnote" id="kpiFootnote"></div>
+  </div>
+</div>
+
+<!-- ============ FILTER BAR ============ -->
+<div class="filterbar-wrap">
+  <div class="container">
+    <div class="filterbar-row">
+      <div class="filter-field">
+        <label for="fContrato">Contrato</label>
+        <div class="search-select" id="ssContrato" data-key="contrato">
+          <input type="text" class="ss-input" placeholder="Buscar contrato...">
+          <button type="button" class="ss-clear">&times;</button>
+          <div class="ss-menu"></div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="fEmpenho">Empenho</label>
+        <div class="search-select" id="ssEmpenho" data-key="empenho">
+          <input type="text" class="ss-input" placeholder="Buscar empenho...">
+          <button type="button" class="ss-clear">&times;</button>
+          <div class="ss-menu"></div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="fFornecedor">Fornecedor</label>
+        <div class="search-select" id="ssFornecedor" data-key="fornecedor">
+          <input type="text" class="ss-input" placeholder="Buscar fornecedor...">
+          <button type="button" class="ss-clear">&times;</button>
+          <div class="ss-menu"></div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="fUf">Estado (UF)</label>
+        <div class="search-select" id="ssUf" data-key="uf">
+          <input type="text" class="ss-input" placeholder="Buscar UF...">
+          <button type="button" class="ss-clear">&times;</button>
+          <div class="ss-menu"></div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="fCategoria">Categoria</label>
+        <div class="search-select" id="ssCategoria" data-key="categoria">
+          <input type="text" class="ss-input" placeholder="Buscar categoria...">
+          <button type="button" class="ss-clear">&times;</button>
+          <div class="ss-menu"></div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="fMesIni">Período — de</label>
+        <div class="search-select" id="ssMesIni" data-key="mesIni">
+          <input type="text" class="ss-input" placeholder="Mês inicial...">
+          <button type="button" class="ss-clear">&times;</button>
+          <div class="ss-menu"></div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="fMesFim">Período — até</label>
+        <div class="search-select" id="ssMesFim" data-key="mesFim">
+          <input type="text" class="ss-input" placeholder="Mês final...">
+          <button type="button" class="ss-clear">&times;</button>
+          <div class="ss-menu"></div>
+        </div>
+      </div>
+    </div>
+    <div class="filterbar-info">
+      <span class="chip-count" id="filterResultChip">—</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MAIN ============ -->
+<main class="container">
+
+  <div class="panel" style="margin-bottom:18px;">
+    <div class="panel-head">
+      <div>
+        <h3 class="section-title">Valores pagos por fornecedor ao mês</h3>
+        <p class="section-desc">Evolução mensal dos pagamentos (OB). Mostra o fornecedor selecionado na segmentação, ou o primeiro em ordem alfabética.</p>
+      </div>
+    </div>
+    <div class="panel-chartbox" style="height:380px;">
+      <canvas id="chartFornecedorMes"></canvas>
+    </div>
+  </div>
+
+  <div class="grid-2b">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="section-title">Categorias por Total Pago</h3>
+          <p class="section-desc">Soma de pagamentos (OB) da carteira filtrada, por categoria de contrato.</p>
+        </div>
+      </div>
+      <div class="panel-chartbox" style="height:340px;">
+        <canvas id="chartCategoria"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="section-title">Total pago por estado</h3>
+          <p class="section-desc">Soma de pagamentos (OB) por UF, mês a mês, via vínculo contrato → empenho → pagamento.</p>
+        </div>
+      </div>
+      <div class="panel-chartbox" style="height:340px;">
+        <canvas id="chartEstado"></canvas>
+      </div>
+      <div class="legend-mini" id="ufCoverageNote"></div>
+    </div>
+  </div>
+
+  <div class="panel table-panel">
+    <div class="panel-head">
+      <div>
+        <h3 class="section-title">Detalhamento</h3>
+        <p class="section-desc">Consulte linha a linha os registros que compõem os indicadores acima.</p>
+      </div>
+    </div>
+    <div class="tabs-row">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="contratos">Contratos</button>
+        <button class="tab-btn" data-tab="empenhos">Empenhos</button>
+        <button class="tab-btn" data-tab="ob">Pagamentos (OB)</button>
+      </div>
+      <input type="text" class="tab-search" id="tableSearch" placeholder="Buscar na tabela...">
+    </div>
+    <div class="table-subfilters" id="contratosSubfilters">
+      <select id="tfCategoria"><option value="">Categoria: todas</option></select>
+      <select id="tfStatus"><option value="">Status: todos</option></select>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <span id="pgInfo">—</span>
+      <div class="pg-btns">
+        <button class="pg-btn" id="pgPrev">← Anterior</button>
+        <button class="pg-btn" id="pgNext">Próxima →</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="container footer-inner">
+    <span>Painel de consulta interna · dados de contratos, empenhos (Comprasnet) e ordens bancárias.</span>
+    <span id="footerCounts">—</span>
+  </div>
+</footer>
+
+<!-- ============ MODAL: ATUALIZAR BASE ============ -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>Atualizar base de dados</h3>
+        <p>Envie os arquivos gerados pelo pipeline (<code>Dashboard_PowerBI/*.ipynb</code>) para recarregar o painel com dados novos — tudo é processado localmente, no seu navegador, sem enviar nada para nenhum servidor.</p>
+      </div>
+      <button class="modal-close" id="closeUploadBtn">&times;</button>
+    </div>
+    <div class="dropzone" id="dropzone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <div><b>Clique para selecionar</b> ou arraste os 3 arquivos .xlsx aqui</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display:none">
+    </div>
+    <div class="file-req">
+      Selecione (ou arraste) os 3 arquivos de uma vez — cada aba é identificada automaticamente pelo nome, não importa a ordem:
+      <br>• <code>base_contratos(tratada).xlsx</code> — aba <code>Contratos</code>
+      <br>• <code>empenhos_comprasnet(tratada).xlsx</code> — aba <code>empenhos</code>
+      <br>• <code>ordens_bancarias(tratada).xlsx</code> — aba <code>OB_semanal_5</code>
+      <br>Um único workbook com as 3 abas também funciona. Se faltar algum, a base atual não é alterada.
+    </div>
+    <div class="upload-status" id="uploadStatus"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" id="resetToExampleBtn" title="Remove a base salva neste navegador e volta ao exemplo">Restaurar exemplo</button>
+      <button class="btn btn-ghost btn-sm" id="cancelUploadBtn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/utils.js"></script>
+<script src="assets/js/storage.js"></script>
+<script src="assets/js/importer.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
