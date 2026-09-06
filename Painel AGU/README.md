@@ -1,3 +1,4 @@
+<img width="1838" height="835" alt="image" src="https://github.com/user-attachments/assets/a968956a-4134-4772-aa19-0efcf47d2f25" />
 # Painel AGU — Execução Orçamentária
 
 Painel de contratos, empenhos e ordens bancárias (Superintendência Regional de Administração
