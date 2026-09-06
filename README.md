@@ -16,6 +16,8 @@ Painel de acompanhamento de contratos, empenhos e pagamentos da AGU (Advocacia-G
 
 O painel nasceu de um protótipo e foi reorganizado em arquivos separados (HTML, CSS e JS isolados), com um importador que lê os arquivos reais gerados pelo pipeline.
 
+<img width="1838" height="835" alt="image" src="https://github.com/user-attachments/assets/f9c54d82-7690-4c67-92fb-0d25117fc153" />
+
 ## Funcionalidades
 
 - Filtros por contrato, empenho, fornecedor, UF, categoria e período de vigência.
